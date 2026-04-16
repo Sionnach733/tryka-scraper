@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+
+# Database
+tryka.db
+
+# Environment
+.env
+venv/
+.venv/
+
+# macOS
+.DS_Store
