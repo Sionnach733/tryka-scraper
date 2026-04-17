@@ -20,12 +20,12 @@ Four tables: `events`, `results`, `raw_splits`, `refined_splits`. `members` is s
 ## Running
 
 ```bash
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 
-python scraper.py                          # scrape all known events
-python scraper.py --db custom.db           # use a different DB file
-python scraper.py --event TD8_5GGDDHUF41  # scrape a single event
-python scraper.py --dry-run               # list events + athlete counts only
+python3 scraper.py                          # scrape all known events
+python3 scraper.py --db custom.db           # use a different DB file
+python3 scraper.py --event TD8_5GGDDHUF41  # scrape a single event
+python3 scraper.py --dry-run               # list events + athlete counts only
 ```
 
 ## Dependencies

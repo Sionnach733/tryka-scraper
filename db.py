@@ -2,6 +2,8 @@ import sqlite3
 import json
 from pathlib import Path
 
+from parser import normalize_member_name
+
 
 def connect(db_path: str = "tryka.db") -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
@@ -10,7 +12,23 @@ def connect(db_path: str = "tryka.db") -> sqlite3.Connection:
     schema = Path(__file__).parent / "schema.sql"
     conn.executescript(schema.read_text())
     conn.commit()
+    _migrate_member_names(conn)
     return conn
+
+
+def _migrate_member_names(conn: sqlite3.Connection) -> None:
+    """One-time migration: reformat member names from 'Surname, Firstname (COUNTRY)'
+    to 'Firstname Surname (COUNTRY)'."""
+    rows = conn.execute("SELECT id, members FROM results").fetchall()
+    for row in rows:
+        old_members = json.loads(row["members"])
+        new_members = [normalize_member_name(m) for m in old_members]
+        if new_members != old_members:
+            conn.execute(
+                "UPDATE results SET members = ? WHERE id = ?",
+                (json.dumps(new_members, ensure_ascii=False), row["id"]),
+            )
+    conn.commit()
 
 
 def upsert_event(conn: sqlite3.Connection, event_id: str, race_name: str, division: str) -> int:
@@ -58,7 +76,7 @@ def insert_result(
         (
             idp,
             event_db_id,
-            json.dumps(members),
+            json.dumps(members, ensure_ascii=False),
             bib_number,
             gym_affiliate,
             age_group,

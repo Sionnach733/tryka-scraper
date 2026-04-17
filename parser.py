@@ -17,6 +17,20 @@ def gender_from_division(division: str) -> str | None:
     return None
 
 
+def normalize_member_name(name: str) -> str:
+    """Convert 'Surname, Firstname (COUNTRY)' to 'Firstname Surname (COUNTRY)' with title case."""
+    m = re.match(r"^(.+?),\s*(.+?)(\s*\(.*\))$", name)
+    if m:
+        surname, firstname, country = m.group(1), m.group(2), m.group(3)
+        return f"{firstname.title()} {surname.title()}{country}"
+    # No country code: "Surname, Firstname"
+    m = re.match(r"^(.+?),\s*(.+)$", name)
+    if m:
+        surname, firstname = m.group(1).strip(), m.group(2).strip()
+        return f"{firstname.title()} {surname.title()}"
+    return name
+
+
 def _text(tag) -> str:
     """Strip HTML and return clean text."""
     return tag.get_text(strip=True).replace("\u2013", "-").replace("\xa0", " ")
@@ -98,6 +112,8 @@ def parse_detail_page(html: str) -> dict | None:
             if name and name != "-":
                 members.append(name)
             i += 1
+
+    members = [normalize_member_name(m) for m in members]
 
     def _clean(v: str | None) -> str | None:
         if not v or v in ("-", "–"):
