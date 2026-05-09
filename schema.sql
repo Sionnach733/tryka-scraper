@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS refined_splits (
 );
 
 CREATE INDEX IF NOT EXISTS idx_results_event ON results(event_id);
+CREATE INDEX IF NOT EXISTS idx_results_event_gender ON results(event_id, gender);
 CREATE INDEX IF NOT EXISTS idx_results_idp ON results(idp);
 CREATE INDEX IF NOT EXISTS idx_raw_splits_result ON raw_splits(result_id);
 CREATE INDEX IF NOT EXISTS idx_refined_splits_result ON refined_splits(result_id);
