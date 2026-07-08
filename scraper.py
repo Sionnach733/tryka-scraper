@@ -58,12 +58,26 @@ ALL_EVENT_IDS = [
     "TCF_5GGDDHUF3F",
     "TDP_5GGDDHUF3F",
     "TP_5GGDDHUF3F",
-    # Juniors (single meeting)
+    # Spring Race 3 – Juniors
     "TK8_5GGDDHUF51",
     "TK10_5GGDDHUF51",
     "TK12_5GGDDHUF51",
     "TK14_5GGDDHUF51",
     "TK16_5GGDDHUF51",
+    # Summer Race 4
+    "TCF_5GGDDHUF67",
+    "TP_5GGDDHUF68",
+    "TDP_5GGDDHUF68",
+    "T5_5GGDDHUF69",
+    "T8_5GGDDHUF69",
+    "TD5_5GGDDHUF69",
+    "TD8_5GGDDHUF69",
+    "TR_5GGDDHUF69",
+    "TK8_5GGDDHUF69",
+    "TK10_5GGDDHUF69",
+    "TK12_5GGDDHUF69",
+    "TK14_5GGDDHUF69",
+    "TK16_5GGDDHUF69",
 ]
 
 REQUEST_DELAY = 0.5  # seconds between requests
@@ -130,30 +144,34 @@ def get_event_meta(session: requests.Session, event_id: str) -> tuple[str, str] 
     return text.strip(), ""
 
 
-def iter_athlete_ids(session: requests.Session, event_id: str) -> Iterator[tuple[str, str, str, str]]:
+def iter_athlete_ids(
+    session: requests.Session, event_id: str
+) -> Iterator[tuple[str, str, str, str | None]]:
     """
     Yield (idp, detail_event_id, search_event_id, sex) tuples for every athlete.
-    Iterates all three gender filters (M, W, X) to capture the full field.
-    detail_event_id and search_event_id are extracted from list page hrefs and may
-    differ from event_id — both are required for detail page fetches to return data.
+    Iterates the three gender filters (M, W, X) first, then a final unfiltered pass
+    (sex=None) to catch athletes the site has not assigned a gender — e.g. junior
+    age groups, which return zero under any M/W/X filter. Athletes are de-duplicated
+    by idp, so the unfiltered pass only yields the ungendered stragglers (with
+    sex=None). detail_event_id and search_event_id are extracted from list page hrefs
+    and may differ from event_id — both are required for detail page fetches.
     """
     seen: set[str] = set()
-    for sex in ("M", "W", "X"):
+    for sex in ("M", "W", "X", None):
         page = 1
         while True:
-            html = fetch(
-                session,
-                {
-                    "content": "list",
-                    "fpid": "list",
-                    "pid": "list",
-                    "lang": "EN_CAP",
-                    "event": event_id,
-                    "search[sex]": sex,
-                    "search[age_class]": "%",
-                    "page": page,
-                },
-            )
+            params = {
+                "content": "list",
+                "fpid": "list",
+                "pid": "list",
+                "lang": "EN_CAP",
+                "event": event_id,
+                "search[age_class]": "%",
+                "page": page,
+            }
+            if sex is not None:
+                params["search[sex]"] = sex
+            html = fetch(session, params)
             entries, total_pages = parse_list_page(html)
             for idp, detail_event, search_event in entries:
                 if idp not in seen:

@@ -68,12 +68,24 @@ def parse_list_page(html: str) -> tuple[list[str], int]:
                 seen.add(idp)
                 entries.append((idp, detail_event, search_event))
 
-    # Find total pages from pagination links
+    # Find total pages from pagination links. The site obfuscates these as
+    # href="#" with a `data-silver` attribute: the real query string encoded as
+    # comma-separated ASCII codes (e.g. "63,112,97,103,101,61,49" -> "?page=1").
     page_nums = set()
-    for a in soup.find_all("a", href=True):
-        m = re.search(r"[?&]page=(\d+)", a["href"])
-        if m:
-            page_nums.add(int(m.group(1)))
+    for a in soup.find_all("a"):
+        candidates = []
+        if a.get("href"):
+            candidates.append(a["href"])
+        silver = a.get("data-silver")
+        if silver:
+            try:
+                candidates.append("".join(chr(int(c)) for c in silver.split(",")))
+            except ValueError:
+                pass
+        for cand in candidates:
+            m = re.search(r"[?&]page=(\d+)", cand)
+            if m:
+                page_nums.add(int(m.group(1)))
     total_pages = max(page_nums) if page_nums else 1
 
     return entries, total_pages
