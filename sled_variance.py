@@ -31,6 +31,23 @@ STATIONS = [
     "Sled Pull", "Rowing", "Lunges", "Burpees",
 ]
 
+# Divisions renamed across races that are the same competitive event. Normalised
+# to a single canonical name so cross-race cohorts merge instead of splitting.
+# TRYKA DOUBLES PRO (Autumn 1, Winter 2) was renamed TRYKA PRO DOUBLES (Spring 3+).
+DIVISION_ALIASES = {
+    "TRYKA DOUBLES PRO": "TRYKA PRO DOUBLES",
+}
+
+# Competitive divisions whose finishers should count even when the source published
+# no overall rank. The Autumn 1 women's Open 500/800 (run as separate Sunday events)
+# have complete 8-station records and finish times but no Overall Rank on the source,
+# so the usual rank_overall gate would wrongly drop them. See CLAUDE.md > Domain notes.
+UNRANKED_BUT_VALID_DIVISIONS = ("TRYKA OPEN 500", "TRYKA OPEN 800")
+
+# Divisions excluded from the analysis. Relay is a relay-format event, not directly
+# comparable to the individual/doubles 8-station workload, so it is dropped.
+EXCLUDE_DIVISIONS = ("TRYKA RELAY",)
+
 # Races in chronological order, with short labels for compact tables.
 RACE_ORDER = [
     ("DUBLIN AUTUMN RACE 1", "Autumn1"),
@@ -51,10 +68,14 @@ def load(db_path: str) -> pd.DataFrame:
         FROM results r
         JOIN events e ON r.event_id = e.id
         JOIN refined_splits rs ON rs.result_id = r.id
-        WHERE r.rank_overall IS NOT NULL
+        WHERE (r.rank_overall IS NOT NULL OR e.division IN ({",".join("?" * len(UNRANKED_BUT_VALID_DIVISIONS))}))
           AND rs.split_name IN ({",".join("?" * len(STATIONS))})
-    """, conn, params=STATIONS)
+    """, conn, params=list(UNRANKED_BUT_VALID_DIVISIONS) + STATIONS)
     conn.close()
+
+    # Merge renamed-but-identical divisions into one canonical cohort.
+    df["division"] = df["division"].replace(DIVISION_ALIASES)
+    df = df[~df["division"].isin(EXCLUDE_DIVISIONS)]
 
     df["split_sec"] = df["split_time"].apply(time_to_seconds)
     wide = df.pivot_table(index=["result_id", "race_name", "division", "gender"],
