@@ -48,6 +48,25 @@ def result_exists(conn: sqlite3.Connection, idp: str, event_db_id: int) -> bool:
     return row is not None
 
 
+def delete_result(conn: sqlite3.Connection, idp: str, event_db_id: int) -> None:
+    """Delete a result and its splits so it can be re-scraped cleanly.
+
+    INSERT OR REPLACE mints a new results.id, which would orphan existing split
+    rows (and, with foreign keys enabled, fail on the parent delete). Force
+    refreshes call this first to remove the old row and its children.
+    """
+    row = conn.execute(
+        "SELECT id FROM results WHERE idp = ? AND event_id = ?", (idp, event_db_id)
+    ).fetchone()
+    if row is None:
+        return
+    result_id = row["id"]
+    conn.execute("DELETE FROM raw_splits WHERE result_id = ?", (result_id,))
+    conn.execute("DELETE FROM refined_splits WHERE result_id = ?", (result_id,))
+    conn.execute("DELETE FROM results WHERE id = ?", (result_id,))
+    conn.commit()
+
+
 def insert_result(
     conn: sqlite3.Connection,
     idp: str,

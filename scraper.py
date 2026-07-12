@@ -191,14 +191,19 @@ def scrape_athlete(
     conn,
     event_db_id: int,
     gender: str | None,
+    force: bool = False,
 ) -> bool:
     """
     Fetch and store a single athlete/team result.
     Returns True if stored, False if skipped (already exists).
+    With force=True, an existing row (and its splits) is deleted and re-fetched
+    so corrected data (gender, times, penalties) is picked up.
     Both detail_event and search_event are required params for the detail page.
     """
     if db.result_exists(conn, idp, event_db_id):
-        return False
+        if not force:
+            return False
+        db.delete_result(conn, idp, event_db_id)
 
     html = fetch(
         session,
@@ -252,6 +257,7 @@ def scrape_event(
     event_id: str,
     conn,
     verbose: bool = True,
+    force: bool = False,
 ) -> int:
     """Scrape all athletes for a single event. Returns count of new records stored."""
     meta = get_event_meta(session, event_id)
@@ -274,7 +280,7 @@ def scrape_event(
         # means separate categories, not mixed pairs.
         gender = sex_filter
         try:
-            ok = scrape_athlete(session, idp, detail_event, search_event, conn, event_db_id, gender)
+            ok = scrape_athlete(session, idp, detail_event, search_event, conn, event_db_id, gender, force)
             if ok:
                 stored += 1
                 if verbose:
@@ -299,6 +305,12 @@ def main() -> None:
         "--dry-run",
         action="store_true",
         help="List events and their result counts without scraping details",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-fetch athletes already in the DB, replacing their rows and splits "
+        "(picks up corrected gender/times/penalties)",
     )
     args = parser.parse_args()
 
@@ -335,7 +347,7 @@ def main() -> None:
     total = 0
     print(f"Scraping {len(event_ids)} event(s) into {args.db}")
     for eid in event_ids:
-        total += scrape_event(session, eid, conn, verbose=True)
+        total += scrape_event(session, eid, conn, verbose=True, force=args.force)
 
     print(f"\nTotal new records stored: {total}")
 
