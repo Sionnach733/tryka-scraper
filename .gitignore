@@ -4,6 +4,7 @@ __pycache__/
 
 # Database
 tryka.db
+tryka.db.bak-*
 
 # Environment
 .env
