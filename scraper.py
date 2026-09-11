@@ -78,6 +78,20 @@ ALL_EVENT_IDS = [
     "TK12_5GGDDHUF69",
     "TK14_5GGDDHUF69",
     "TK16_5GGDDHUF69",
+    # London Race 5
+    "TCF_5GGDDHUF79",
+    "TP_5GGDDHUF79",
+    "TDP_5GGDDHUF79",
+    "T5_5GGDDHUF7A",
+    "T8_5GGDDHUF7A",
+    "TD5_5GGDDHUF7A",
+    "TD8_5GGDDHUF7A",
+    "TR_5GGDDHUF7A",
+    "TK8_5GGDDHUF79",
+    "TK10_5GGDDHUF79",
+    "TK12_5GGDDHUF79",
+    "TK14_5GGDDHUF79",
+    "TK16_5GGDDHUF79",
 ]
 
 REQUEST_DELAY = 0.5  # seconds between requests
@@ -325,20 +339,30 @@ def main() -> None:
             meta = get_event_meta(session, eid)
             if meta:
                 race_name, division = meta
-                html = fetch(
-                    session,
-                    {
-                        "content": "list",
-                        "fpid": "list",
-                        "pid": "list",
-                        "lang": "EN_CAP",
-                        "event": eid,
-                        "search[sex]": "X",
-                        "search[age_class]": "%",
-                    },
-                )
-                m = re.search(r"(\d+)\s+Results", html)
-                count = m.group(1) if m else "?"
+                # "%" (all genders) gives an accurate count for solo divisions, but some
+                # team/mixed divisions (e.g. Clan Fitness, Relay) only render a result
+                # list under the "X" filter — fall back to it if "%" comes back empty.
+                count = "?"
+                for sex_filter in ("%", "X"):
+                    html = fetch(
+                        session,
+                        {
+                            "content": "list",
+                            "fpid": "list",
+                            "pid": "list",
+                            "lang": "EN_CAP",
+                            "event": eid,
+                            "search[sex]": sex_filter,
+                            "search[age_class]": "%",
+                        },
+                    )
+                    m = re.search(r"(\d+)\s+Results", html)
+                    if m:
+                        count = m.group(1)
+                        break
+                    if "no results available" in html:
+                        count = "0"
+                        break
                 print(f"  {eid:30s}  {race_name} / {division}  ({count} athletes)")
             else:
                 print(f"  {eid:30s}  (no results)")
