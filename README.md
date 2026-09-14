@@ -33,6 +33,15 @@ This one command:
 3. Runs `scraper.py` against every known event, logging output to `logs/fetch-<timestamp>.log`
 4. Prints a before/after result-count summary
 
+If the host's system Python is externally managed (e.g. recent Ubuntu/Debian, which
+refuses a plain `pip install`), create a virtualenv once and `update_prod.sh` will use it
+automatically whenever `.venv/` exists:
+
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
 It's safe to re-run any time — already-stored athletes are skipped, so running it again
 (or daily, while a race is still posting results) only fetches what's new.
 

@@ -10,6 +10,12 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 echo "== git pull =="
 git pull
 
+if [ -x .venv/bin/python3 ]; then
+    PYTHON=.venv/bin/python3
+else
+    PYTHON=python3
+fi
+
 if [ -f tryka.db ]; then
     backup="tryka.db.bak-$(date +%Y%m%d-%H%M%S)"
     echo "== backing up tryka.db to $backup =="
@@ -27,7 +33,7 @@ if [ -f tryka.db ]; then
     before=$(sqlite3 tryka.db "select count(*) from results;")
 fi
 
-python3 scraper.py 2>&1 | tee "$log"
+"$PYTHON" scraper.py 2>&1 | tee "$log"
 
 after=$(sqlite3 tryka.db "select count(*) from results;")
 echo "== done: $before -> $after results ($((after - before)) new) =="
