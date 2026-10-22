@@ -22,10 +22,11 @@ import db
 from parser import gender_from_division, parse_detail_page, parse_list_page
 
 
-BASE_URL = "https://tryka.r.mikatiming.com/"
+# The site root now serves Series 2; Series 1 (the six races below) lives under /series-1/.
+BASE_URL = "https://tryka.r.mikatiming.com/series-1/"
 MEETING_ID = "5GGDDHUF2E"
 
-# All known event IDs. Covers all 3 races across every division.
+# All known Series 1 event IDs. Covers all 6 races across every division.
 ALL_EVENT_IDS = [
     # Autumn Race 1 – Saturday
     "T5_5GGDDHUF15",
@@ -92,6 +93,15 @@ ALL_EVENT_IDS = [
     "TK12_5GGDDHUF79",
     "TK14_5GGDDHUF79",
     "TK16_5GGDDHUF79",
+    # Lisbon Race 6 Grand Finale
+    "TP_5GGDDHUF8D",
+    "TDP_5GGDDHUF8D",
+    "T5_5GGDDHUF8D",
+    "T8_5GGDDHUF8D",
+    "TD5_5GGDDHUF8D",
+    "TD8_5GGDDHUF8D",
+    "TR_5GGDDHUF8D",
+    "TK14_5GGDDHUF8D",
 ]
 
 REQUEST_DELAY = 0.5  # seconds between requests
