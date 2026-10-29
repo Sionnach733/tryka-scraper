@@ -33,6 +33,12 @@ This one command:
 3. Runs `scraper.py` against every known event, logging output to `logs/fetch-<timestamp>.log`
 4. Prints a before/after result-count summary
 
+Any arguments are passed through to `scraper.py`, so to re-fetch a single event:
+
+```bash
+./update_prod.sh --event TR_5GGDDHUF69
+```
+
 If the host's system Python is externally managed (e.g. recent Ubuntu/Debian, which
 refuses a plain `pip install`), create a virtualenv once and `update_prod.sh` will use it
 automatically whenever `.venv/` exists:

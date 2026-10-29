@@ -3,6 +3,8 @@
 # Safe to re-run any time: scraper.py skips athletes already stored,
 # so a repeat run only fetches genuinely new results (e.g. as a
 # still-in-progress race fills in).
+# Any arguments are passed through to scraper.py, e.g.
+#   ./update_prod.sh --event TR_5GGDDHUF69
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
@@ -33,7 +35,7 @@ if [ -f tryka.db ]; then
     before=$(sqlite3 tryka.db "select count(*) from results;")
 fi
 
-"$PYTHON" scraper.py 2>&1 | tee "$log"
+"$PYTHON" scraper.py "$@" 2>&1 | tee "$log"
 
 after=$(sqlite3 tryka.db "select count(*) from results;")
 echo "== done: $before -> $after results ($((after - before)) new) =="

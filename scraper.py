@@ -19,7 +19,7 @@ import requests
 from bs4 import BeautifulSoup
 
 import db
-from parser import gender_from_division, parse_detail_page, parse_list_page
+from parser import gender_from_division, parse_detail_page, parse_list_fields, parse_list_page
 
 
 # The site root now serves Series 2; Series 1 (the six races below) lives under /series-1/.
@@ -170,9 +170,10 @@ def get_event_meta(session: requests.Session, event_id: str) -> tuple[str, str] 
 
 def iter_athlete_ids(
     session: requests.Session, event_id: str
-) -> Iterator[tuple[str, str, str, str | None]]:
+) -> Iterator[tuple[str, str, str, str | None, dict]]:
     """
-    Yield (idp, detail_event_id, search_event_id, sex) tuples for every athlete.
+    Yield (idp, detail_event_id, search_event_id, sex, list_fields) tuples for every
+    athlete. list_fields holds the rank/time shown on the list page row.
     Iterates the three gender filters (M, W, X) first, then a final unfiltered pass
     (sex=None) to catch athletes the site has not assigned a gender — e.g. junior
     age groups, which return zero under any M/W/X filter. Athletes are de-duplicated
@@ -197,10 +198,11 @@ def iter_athlete_ids(
                 params["search[sex]"] = sex
             html = fetch(session, params)
             entries, total_pages = parse_list_page(html)
+            list_fields = parse_list_fields(html)
             for idp, detail_event, search_event in entries:
                 if idp not in seen:
                     seen.add(idp)
-                    yield idp, detail_event, search_event, sex
+                    yield idp, detail_event, search_event, sex, list_fields.get(idp, {})
 
             if page >= total_pages:
                 break
@@ -216,6 +218,7 @@ def scrape_athlete(
     event_db_id: int,
     gender: str | None,
     force: bool = False,
+    list_fields: dict | None = None,
 ) -> bool:
     """
     Fetch and store a single athlete/team result.
@@ -249,6 +252,11 @@ def scrape_athlete(
         return False
 
     gender = gender or gender_from_division(data.get("division") or "")
+
+    # Some detail pages are published without rank/time; fall back to the list row.
+    for key in ("rank_overall", "rank_age_group", "overall_time"):
+        if data.get(key) is None and list_fields:
+            data[key] = list_fields.get(key)
 
     result_id = db.insert_result(
         conn,
@@ -298,13 +306,15 @@ def scrape_event(
 
     stored = 0
     skipped = 0
-    for idp, detail_event, search_event, sex_filter in iter_athlete_ids(session, event_id):
+    for idp, detail_event, search_event, sex_filter, list_fields in iter_athlete_ids(session, event_id):
         # sex_filter is the authoritative gender source: it reflects which list filter
         # (M/W/X) returned this athlete. Division name is not reliable — "MENS/WOMENS"
         # means separate categories, not mixed pairs.
         gender = sex_filter
         try:
-            ok = scrape_athlete(session, idp, detail_event, search_event, conn, event_db_id, gender, force)
+            ok = scrape_athlete(
+                session, idp, detail_event, search_event, conn, event_db_id, gender, force, list_fields
+            )
             if ok:
                 stored += 1
                 if verbose:
