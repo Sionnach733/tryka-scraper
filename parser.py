@@ -91,6 +91,35 @@ def parse_list_page(html: str) -> tuple[list[str], int]:
     return entries, total_pages
 
 
+def parse_list_fields(html: str) -> dict[str, dict]:
+    """
+    Parse rank, age-group rank and finish time from each row of a results list page.
+    Returns {idp: {"rank_overall", "rank_age_group", "overall_time"}}.
+    Used as a fallback when a detail page is published without these fields
+    (e.g. late-added Summer Race 4 relay teams).
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    rows: dict[str, dict] = {}
+    for li in soup.select("li.list-group-item"):
+        a = li.find("a", href=re.compile(r"[?&]idp="))
+        if not a:
+            continue
+        idp = re.search(r"[?&]idp=([A-Z0-9]+)", a["href"]).group(1)
+        primary = li.select_one(".type-place.place-primary")
+        secondary = li.select_one(".type-place.place-secondary")
+        time_div = li.select_one(".type-time")
+        if time_div:
+            for label in time_div.select(".list-label"):
+                label.decompose()
+        time_text = _text(time_div) if time_div else ""
+        rows[idp] = {
+            "rank_overall": _parse_int(_text(primary)) if primary else None,
+            "rank_age_group": _parse_int(_text(secondary)) if secondary else None,
+            "overall_time": time_text if re.fullmatch(r"\d{1,2}:\d{2}:\d{2}", time_text) else None,
+        }
+    return rows
+
+
 def parse_detail_page(html: str) -> dict | None:
     """
     Parse an athlete/team detail page.
