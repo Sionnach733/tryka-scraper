@@ -2,7 +2,7 @@ import sqlite3
 import json
 from pathlib import Path
 
-from parser import normalize_member_name
+from parser import is_placeholder_team, normalize_member_name
 
 
 def connect(db_path: str = "tryka.db") -> sqlite3.Connection:
@@ -64,6 +64,56 @@ def delete_result(conn: sqlite3.Connection, idp: str, event_db_id: int) -> None:
     conn.execute("DELETE FROM raw_splits WHERE result_id = ?", (result_id,))
     conn.execute("DELETE FROM refined_splits WHERE result_id = ?", (result_id,))
     conn.execute("DELETE FROM results WHERE id = ?", (result_id,))
+    conn.commit()
+
+
+def purge_placeholder_results(conn: sqlite3.Connection, event_db_id: int) -> set[str | None]:
+    """Delete placeholder teams (see is_placeholder_team) stored for an event.
+    Returns the genders that had rows removed, so their ranks can be compacted."""
+    rows = conn.execute(
+        "SELECT idp, gender, members FROM results WHERE event_id = ?", (event_db_id,)
+    ).fetchall()
+    genders: set[str | None] = set()
+    for row in rows:
+        if is_placeholder_team(json.loads(row["members"])):
+            delete_result(conn, row["idp"], event_db_id)
+            genders.add(row["gender"])
+    return genders
+
+
+def compact_ranks(conn: sqlite3.Connection, event_db_id: int, gender: str | None) -> None:
+    """Close the gaps placeholder teams leave in an event/gender's published ranks.
+
+    Keeps the site's ordering (and ties) and renumbers it densely: overall rank
+    within the gender, age-group rank within each age group.
+    """
+    rows = conn.execute(
+        "SELECT id, age_group, rank_overall, rank_age_group FROM results "
+        "WHERE event_id = ? AND gender IS ? AND rank_overall IS NOT NULL",
+        (event_db_id, gender),
+    ).fetchall()
+
+    def dense(values):
+        return {v: i + 1 for i, v in enumerate(sorted(set(values)))}
+
+    overall = dense(r["rank_overall"] for r in rows)
+    by_age: dict = {}
+    for r in rows:
+        if r["rank_age_group"] is not None:
+            by_age.setdefault(r["age_group"], []).append(r["rank_age_group"])
+    age_maps = {ag: dense(v) for ag, v in by_age.items()}
+
+    conn.executemany(
+        "UPDATE results SET rank_overall = ?, rank_age_group = ? WHERE id = ?",
+        [
+            (
+                overall[r["rank_overall"]],
+                age_maps[r["age_group"]][r["rank_age_group"]] if r["rank_age_group"] is not None else None,
+                r["id"],
+            )
+            for r in rows
+        ],
+    )
     conn.commit()
 
 
