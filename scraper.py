@@ -19,7 +19,13 @@ import requests
 from bs4 import BeautifulSoup
 
 import db
-from parser import gender_from_division, parse_detail_page, parse_list_fields, parse_list_page
+from parser import (
+    gender_from_division,
+    is_placeholder_team,
+    parse_detail_page,
+    parse_list_fields,
+    parse_list_page,
+)
 
 
 # The site root now serves Series 2; Series 1 (the six races below) lives under /series-1/.
@@ -219,6 +225,7 @@ def scrape_athlete(
     gender: str | None,
     force: bool = False,
     list_fields: dict | None = None,
+    placeholder_genders: set | None = None,
 ) -> bool:
     """
     Fetch and store a single athlete/team result.
@@ -252,6 +259,11 @@ def scrape_athlete(
         return False
 
     gender = gender or gender_from_division(data.get("division") or "")
+
+    if is_placeholder_team(data["members"]):
+        if placeholder_genders is not None:
+            placeholder_genders.add(gender)
+        return False
 
     # Some detail pages are published without rank/time; fall back to the list row.
     for key in ("rank_overall", "rank_age_group", "overall_time"):
@@ -306,6 +318,7 @@ def scrape_event(
 
     stored = 0
     skipped = 0
+    placeholder_genders: set[str | None] = set()
     for idp, detail_event, search_event, sex_filter, list_fields in iter_athlete_ids(session, event_id):
         # sex_filter is the authoritative gender source: it reflects which list filter
         # (M/W/X) returned this athlete. Division name is not reliable — "MENS/WOMENS"
@@ -313,7 +326,8 @@ def scrape_event(
         gender = sex_filter
         try:
             ok = scrape_athlete(
-                session, idp, detail_event, search_event, conn, event_db_id, gender, force, list_fields
+                session, idp, detail_event, search_event, conn, event_db_id, gender, force, list_fields,
+                placeholder_genders,
             )
             if ok:
                 stored += 1
@@ -325,6 +339,14 @@ def scrape_event(
             print(f"\n    WARNING: HTTP error for {idp}: {e}", file=sys.stderr)
         except Exception as e:
             print(f"\n    WARNING: failed to parse {idp}: {e}", file=sys.stderr)
+
+    # Placeholder teams are skipped above; also remove any stored by earlier runs,
+    # then close the rank gaps they leave behind.
+    placeholder_genders |= db.purge_placeholder_results(conn, event_db_id)
+    for g in placeholder_genders:
+        db.compact_ranks(conn, event_db_id, g)
+    if verbose and placeholder_genders:
+        print(f"\n    removed placeholder teams, re-ranked gender(s): {sorted(map(str, placeholder_genders))}")
 
     if verbose:
         print(f"\n    done: {stored} stored, {skipped} skipped (already in DB)")

@@ -31,6 +31,15 @@ def normalize_member_name(name: str) -> str:
     return name
 
 
+def is_placeholder_team(members: list[str]) -> bool:
+    """
+    True for unclaimed bib entries the timing system publishes with numeric
+    member names (e.g. ["1", "2", "3", "4"] or ["Fred Martin", "2 2", "3", "4"])
+    and dummy finish times — seen in the London Race 5 men's relay.
+    """
+    return any(re.fullmatch(r"[\d\s]+", m) for m in members)
+
+
 def _text(tag) -> str:
     """Strip HTML and return clean text."""
     return tag.get_text(strip=True).replace("\u2013", "-").replace("\xa0", " ")
