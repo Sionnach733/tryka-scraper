@@ -170,17 +170,25 @@ def parse_detail_page(html: str) -> dict | None:
             return None
         return v
 
+    # The site was redesigned in Nov 2026 and renamed several fields; the second
+    # name in each pair is the current one.
+    def _field(*names: str) -> str | None:
+        for name in names:
+            if name in fields:
+                return fields[name]
+        return None
+
     result = {
         "race_name": _clean(fields.get("Event")),
         "division": _clean(fields.get("Division")),
         "members": members,
-        "bib_number": _clean(fields.get("Bib Number")),
+        "bib_number": _clean(_field("Bib Number", "Race number")),
         "gym_affiliate": _clean(fields.get("Gym Affiliate")),
         "age_group": _clean(fields.get("Age Group")),
-        "rank_overall": _parse_int(fields.get("Rank (M/W)", "")),
-        "rank_age_group": _parse_int(fields.get("Rank (AG)", "")),
-        "league_points": _parse_int(fields.get("League Points", "")),
-        "overall_time": _clean(fields.get("Overall Time")),
+        "rank_overall": _parse_int(_field("Rank (M/W)", "Overall Rank (M/F)") or ""),
+        "rank_age_group": _parse_int(_field("Rank (AG)", "Overall Rank (AG)") or ""),
+        "league_points": _parse_int(_field("League Points", "Total League Points") or ""),
+        "overall_time": _clean(_field("Overall Time", "Finish")),
         "penalty": _clean(fields.get("Penalty")),
         "bonus": _clean(fields.get("Bonus")),
         "disqual_reason": _clean(fields.get("Disqual Reason")),
@@ -208,17 +216,18 @@ def parse_detail_page(html: str) -> dict | None:
     result["raw_splits"] = raw_splits
 
     # --- Refined splits (table with Split / Time / Place) ---
+    # Since the redesign, Place is replaced by Day and Overall rank columns
+    # (M/F, AG, M/F, AG); the first, Day M/F, is the old Place.
     refined_splits = []
     for table in soup.find_all("table"):
         headers = [_text(th) for th in table.find_all("th")]
-        if headers == ["Split", "Time", "Place"] or (
-            "Split" in headers and "Time" in headers and "Place" in headers
-            and "Time Of Day" not in headers
-        ):
+        if "Split" in headers and "Time" in headers and (
+            "Place" in headers or "M/F" in headers
+        ) and "Time Of Day" not in headers:
             for row in table.find("tbody").find_all("tr"):
                 th = row.find("th")
                 tds = row.find_all("td")
-                if not th or len(tds) < 2:
+                if not th or len(tds) < 2 or not _clean(_text(th)):
                     continue
                 place_text = _clean(_text(tds[1])) if len(tds) > 1 else None
                 refined_splits.append(

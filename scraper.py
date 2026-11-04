@@ -28,12 +28,15 @@ from parser import (
 )
 
 
-# The site root now serves Series 2; Series 1 (the six races below) lives under /series-1/.
-BASE_URL = "https://tryka.r.mikatiming.com/series-1/"
+# Each series has its own path; the site root also serves whichever series is current.
+SERIES_BASE_URLS = {
+    1: "https://tryka.r.mikatiming.com/series-1/",
+    2: "https://tryka.r.mikatiming.com/series-2/",
+}
 MEETING_ID = "5GGDDHUF2E"
 
 # All known Series 1 event IDs. Covers all 6 races across every division.
-ALL_EVENT_IDS = [
+SERIES_1_EVENT_IDS = [
     # Autumn Race 1 – Saturday
     "T5_5GGDDHUF15",
     "T8_5GGDDHUF15",
@@ -110,6 +113,31 @@ ALL_EVENT_IDS = [
     "TK14_5GGDDHUF8D",
 ]
 
+# All known Series 2 event IDs.
+SERIES_2_EVENT_IDS = [
+    # Dublin Series 2 Race 1
+    "TP_5GGDDHUFA1",
+    "TDP_5GGDDHUFA1",
+    "TCF_5GGDDHUFA1",
+    "T5_5GGDDHUFA2",
+    "T8_5GGDDHUFA2",
+    "TD5_5GGDDHUFA2",
+    "TD8_5GGDDHUFA2",
+    "TR_5GGDDHUFA2",
+    "TK8_5GGDDHUFA1",
+    "TK10_5GGDDHUFA1",
+    "TK12_5GGDDHUFA1",
+    "TK14_5GGDDHUFA1",
+    "TK16_5GGDDHUFA1",
+]
+
+# event ID -> series number, in scrape order.
+EVENT_SERIES = {
+    **{eid: 1 for eid in SERIES_1_EVENT_IDS},
+    **{eid: 2 for eid in SERIES_2_EVENT_IDS},
+}
+ALL_EVENT_IDS = list(EVENT_SERIES)
+
 REQUEST_DELAY = 0.5  # seconds between requests
 
 
@@ -126,8 +154,8 @@ def make_session() -> requests.Session:
     return session
 
 
-def fetch(session: requests.Session, params: dict) -> str:
-    resp = session.get(BASE_URL, params=params, timeout=30)
+def fetch(session: requests.Session, series: int, params: dict) -> str:
+    resp = session.get(SERIES_BASE_URLS[series], params=params, timeout=30)
     resp.raise_for_status()
     time.sleep(REQUEST_DELAY)
     return resp.text
@@ -137,6 +165,7 @@ def get_event_meta(session: requests.Session, event_id: str) -> tuple[str, str] 
     """Return (race_name, division) for an event_id, or None if no results."""
     html = fetch(
         session,
+        EVENT_SERIES[event_id],
         {
             "content": "list",
             "fpid": "list",
@@ -202,7 +231,7 @@ def iter_athlete_ids(
             }
             if sex is not None:
                 params["search[sex]"] = sex
-            html = fetch(session, params)
+            html = fetch(session, EVENT_SERIES[event_id], params)
             entries, total_pages = parse_list_page(html)
             list_fields = parse_list_fields(html)
             for idp, detail_event, search_event in entries:
@@ -223,6 +252,7 @@ def scrape_athlete(
     conn,
     event_db_id: int,
     gender: str | None,
+    series: int,
     force: bool = False,
     list_fields: dict | None = None,
     placeholder_genders: set | None = None,
@@ -241,6 +271,7 @@ def scrape_athlete(
 
     html = fetch(
         session,
+        series,
         {
             "content": "detail",
             "fpid": "list",
@@ -314,7 +345,8 @@ def scrape_event(
     if verbose:
         print(f"  [{event_id}] {race_name} / {division}")
 
-    event_db_id = db.upsert_event(conn, event_id, race_name, division)
+    series = EVENT_SERIES[event_id]
+    event_db_id = db.upsert_event(conn, event_id, race_name, division, series)
 
     stored = 0
     skipped = 0
@@ -326,7 +358,7 @@ def scrape_event(
         gender = sex_filter
         try:
             ok = scrape_athlete(
-                session, idp, detail_event, search_event, conn, event_db_id, gender, force, list_fields,
+                session, idp, detail_event, search_event, conn, event_db_id, gender, series, force, list_fields,
                 placeholder_genders,
             )
             if ok:
@@ -373,6 +405,8 @@ def main() -> None:
     conn = db.connect(args.db)
     session = make_session()
 
+    if args.event and args.event not in EVENT_SERIES:
+        parser.error(f"unknown event {args.event}: add it to a SERIES_*_EVENT_IDS list first")
     event_ids = [args.event] if args.event else ALL_EVENT_IDS
 
     if args.dry_run:
@@ -388,6 +422,7 @@ def main() -> None:
                 for sex_filter in ("%", "X"):
                     html = fetch(
                         session,
+                        EVENT_SERIES[eid],
                         {
                             "content": "list",
                             "fpid": "list",

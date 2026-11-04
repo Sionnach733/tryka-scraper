@@ -19,6 +19,8 @@ Four tables: `events`, `results`, `raw_splits`, `refined_splits`. `members` is s
 
 ## Domain notes
 
+- **Series.** Races are grouped into series, stored as `events.series`. Series 1 is the six races from Autumn 1 to Lisbon 6, now served under `/series-1/`. Series 2 started with Dublin Series 2 Race 1 and is served at the site root. Each series' base URL is in `SERIES_BASE_URLS`. To add a race, append its event IDs to that series' `SERIES_<n>_EVENT_IDS` list in `scraper.py`.
+
 - **Division renames.** Some divisions were renamed across races but are the *same* competitive event and must be treated as one cohort in any cross-race analysis. Known aliases:
   - `TRYKA DOUBLES PRO` (Autumn 1, Winter 2) → renamed to `TRYKA PRO DOUBLES` (Spring 3 onward). Canonical name: `TRYKA PRO DOUBLES`.
   - Canonical division-alias map lives in `sled_variance.py` (`DIVISION_ALIASES`); add new aliases there so analyses stay consistent.

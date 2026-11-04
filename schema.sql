@@ -2,7 +2,8 @@ CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id TEXT NOT NULL UNIQUE,
     race_name TEXT NOT NULL,
-    division TEXT NOT NULL
+    division TEXT NOT NULL,
+    series INTEGER                   -- Tryka series number (1, 2, ...)
 );
 
 CREATE TABLE IF NOT EXISTS results (

@@ -12,8 +12,20 @@ def connect(db_path: str = "tryka.db") -> sqlite3.Connection:
     schema = Path(__file__).parent / "schema.sql"
     conn.executescript(schema.read_text())
     conn.commit()
+    _migrate_event_series(conn)
     _migrate_member_names(conn)
     return conn
+
+
+def _migrate_event_series(conn: sqlite3.Connection) -> None:
+    """One-time migration: add events.series. Every event stored before the column
+    existed belongs to Series 1."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(events)")}
+    if "series" in cols:
+        return
+    conn.execute("ALTER TABLE events ADD COLUMN series INTEGER")
+    conn.execute("UPDATE events SET series = 1")
+    conn.commit()
 
 
 def _migrate_member_names(conn: sqlite3.Connection) -> None:
@@ -31,11 +43,14 @@ def _migrate_member_names(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
-def upsert_event(conn: sqlite3.Connection, event_id: str, race_name: str, division: str) -> int:
+def upsert_event(
+    conn: sqlite3.Connection, event_id: str, race_name: str, division: str, series: int
+) -> int:
     conn.execute(
-        "INSERT OR IGNORE INTO events (event_id, race_name, division) VALUES (?, ?, ?)",
-        (event_id, race_name, division),
+        "INSERT OR IGNORE INTO events (event_id, race_name, division, series) VALUES (?, ?, ?, ?)",
+        (event_id, race_name, division, series),
     )
+    conn.execute("UPDATE events SET series = ? WHERE event_id = ?", (series, event_id))
     conn.commit()
     row = conn.execute("SELECT id FROM events WHERE event_id = ?", (event_id,)).fetchone()
     return row["id"]
