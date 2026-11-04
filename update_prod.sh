@@ -35,7 +35,8 @@ if [ -f tryka.db ]; then
     before=$(sqlite3 tryka.db "select count(*) from results;")
 fi
 
-"$PYTHON" scraper.py "$@" 2>&1 | tee "$log"
+# -u: unbuffered, so progress shows live through tee instead of in large chunks.
+"$PYTHON" -u scraper.py "$@" 2>&1 | tee "$log"
 
 after=$(sqlite3 tryka.db "select count(*) from results;")
 echo "== done: $before -> $after results ($((after - before)) new) =="
