@@ -17,6 +17,22 @@ python scraper.py --event TD8_5GGDDHUF41  # scrape a single event
 python scraper.py --dry-run               # list events + athlete counts, no scraping
 ```
 
+## Development
+
+```bash
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/ruff check .        # lint
+.venv/bin/pytest              # unit tests + offline end-to-end scrape
+```
+
+The tests never contact the live site. `tests/test_e2e_scrape.py` runs `scraper.py` against real pages recorded in `tests/fixtures/html/` (Lisbon Race 6 TRYKA PRO and London Race 5 TRYKA RELAY, plus one paginated list page). If the site's HTML changes and you need fresh fixtures, re-record them once by hand. This fetches about 50 pages:
+
+```bash
+.venv/bin/python tests/record_fixtures.py
+```
+
+`main` is protected: open a PR, and the `CI` check (ruff, compile, pytest) must pass before merge.
+
 ## Running on production
 
 To fetch new/updated results into the production `tryka.db`, from the repo root on the

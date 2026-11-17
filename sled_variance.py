@@ -152,7 +152,7 @@ def main():
     pooled_wide["share"] = pooled_wide[args.station] / pooled_wide["total"] * 100
     pooled_wide["label"] = pooled_wide["race_name"].map(dict(RACE_ORDER))
     g = pooled_wide.pivot_table(index="gender", columns="label", values="share",
-                                aggfunc="median").reindex(columns=[l for _, l in RACE_ORDER])
+                                aggfunc="median").reindex(columns=[label for _, label in RACE_ORDER])
     g["Su4-Δ"] = g[TARGET_LABEL] - g[PRIOR_LABELS].mean(axis=1)
     print_header(f"{args.station.upper()} — SHARE POOLED BY GENDER (all qualifying divisions)")
     print_table(g.round(1))
